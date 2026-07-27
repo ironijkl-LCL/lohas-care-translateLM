@@ -304,17 +304,16 @@
   </div>
 
   <script>
-    // 配置為你設定好的 Dify API 金鑰
-    const DIFY_API_BASE_URL = 'https://api.dify.ai/v1';
-    const DIFY_API_KEY = 'app-NxfBcZH1BAb8eR0qcbd1GuUq'; 
+    // 指向在 Render 上運作的完整 API 網址，確保 GitHub Pages 可以順利連線
+    const BACKEND_API_URL = 'https://lohas-care-translatelm.onrender.com/api/translate'; 
 
-    let currentTone = 0; 
+    let currentTone = 0; // 0: Street, 1: Smart, 2: Elite
     let targetLang = "en-US";
     let isListening = false;
     let recognition = null;
     let currentInputText = "我想食壽司";
 
-    // 正式呼叫 Dify 翻譯 API 邏輯
+    // API 呼叫邏輯
     async function fetchDifyTranslation(inputText) {
       const targetTextEl = document.getElementById('target-text');
       const insightTextEl = document.getElementById('insight-text');
@@ -323,20 +322,13 @@
       statusEl.innerText = "⚡ AI 思考中...";
 
       try {
-        const response = await fetch(`${DIFY_API_BASE_URL}/chat-messages`, {
+        const response = await fetch(BACKEND_API_URL, {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${DIFY_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            inputs: {
-              tone: String(currentTone),
-              target_lang: targetLang
-            },
             query: inputText,
-            response_mode: "blocking",
-            user: "lingo-prime-user"
+            tone: String(currentTone),
+            target_lang: targetLang
           })
         });
 
@@ -346,25 +338,38 @@
 
         const data = await response.json();
         
+        // 解析 JSON 資料
         let parsedResult;
-        if (typeof data.answer === 'string') {
+        let rawAnswer = data.translation ? data : (data.answer || data);
+
+        if (typeof rawAnswer === 'string') {
+          try {
+            parsedResult = JSON.parse(rawAnswer);
+          } catch {
+            parsedResult = { translation: rawAnswer, insight: "無詳細解構資訊" };
+          }
+        } else if (typeof data.answer === 'string') {
           try {
             parsedResult = JSON.parse(data.answer);
           } catch {
-            parsedResult = { translation: data.answer, insight: "無解構資訊" };
+            parsedResult = { translation: data.answer, insight: "無詳細解構資訊" };
           }
         } else {
-          parsedResult = data.answer || data;
+          parsedResult = rawAnswer;
         }
 
-        targetTextEl.innerText = `"${parsedResult.translation || parsedResult.text || ''}"`;
-        insightTextEl.innerHTML = `<strong>👨‍🏫 名師解構：</strong>${parsedResult.insight || '無詳細解構'}`;
+        // 動態渲染至 UI
+        const finalTranslation = parsedResult.translation || parsedResult.text || parsedResult.result || '';
+        const finalInsight = parsedResult.insight || '無詳細解構';
+
+        targetTextEl.innerText = `"${finalTranslation}"`;
+        insightTextEl.innerHTML = `<strong>👨‍🏫 名師解構：</strong>${finalInsight}`;
         statusEl.innerText = "分析完成";
 
       } catch (error) {
-        console.error("Dify API Request Failed:", error);
+        console.error("API Request Failed:", error);
         statusEl.innerText = "❌ 傳輸錯誤";
-        insightTextEl.innerHTML = "<strong>⚠️ 系統提示：</strong>無法連線至 API。若在本機檔案（file://）開啟，請改用 Live Server 或是存取 Render 線上版本。";
+        insightTextEl.innerHTML = "<strong>⚠️ 系統提示：</strong>無法連線至代理伺服器。請確認 Render 後端服務狀態是否為 Active。";
       }
     }
 
@@ -401,7 +406,7 @@
       window.speechSynthesis.speak(utterance);
     }
 
-    // Web Speech API
+    // Web Speech API 設定
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognition = new SpeechRecognition();
