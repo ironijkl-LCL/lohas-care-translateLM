@@ -304,17 +304,17 @@
   </div>
 
   <script>
-    // Dify API 配置
+    // 配置為你設定好的 Dify API 金鑰
     const DIFY_API_BASE_URL = 'https://api.dify.ai/v1';
-    const DIFY_API_KEY = 'YOUR_DIFY_APP_API_KEY'; // ⚠️ 請更換為你的 Dify App API Key
+    const DIFY_API_KEY = 'app-NxfBcZH1BAb8eR0qcbd1GuUq'; 
 
-    let currentTone = 0; // 0: Street, 1: Smart, 2: Elite
+    let currentTone = 0; 
     let targetLang = "en-US";
     let isListening = false;
     let recognition = null;
     let currentInputText = "我想食壽司";
 
-    // 呼叫 Dify API 連線邏輯
+    // 正式呼叫 Dify 翻譯 API 邏輯
     async function fetchDifyTranslation(inputText) {
       const targetTextEl = document.getElementById('target-text');
       const insightTextEl = document.getElementById('insight-text');
@@ -346,20 +346,17 @@
 
         const data = await response.json();
         
-        // 解析內層字串 (處理轉義 JSON)
         let parsedResult;
         if (typeof data.answer === 'string') {
           try {
             parsedResult = JSON.parse(data.answer);
           } catch {
-            // 如果二級不是 JSON 字串，則直接使用
             parsedResult = { translation: data.answer, insight: "無解構資訊" };
           }
         } else {
           parsedResult = data.answer || data;
         }
 
-        // 更新介面
         targetTextEl.innerText = `"${parsedResult.translation || parsedResult.text || ''}"`;
         insightTextEl.innerHTML = `<strong>👨‍🏫 名師解構：</strong>${parsedResult.insight || '無詳細解構'}`;
         statusEl.innerText = "分析完成";
@@ -367,7 +364,7 @@
       } catch (error) {
         console.error("Dify API Request Failed:", error);
         statusEl.innerText = "❌ 傳輸錯誤";
-        insightTextEl.innerHTML = "<strong>⚠️ 系統提示：</strong>無法連線至 API，請檢查 API Key 或網路設定。";
+        insightTextEl.innerHTML = "<strong>⚠️ 系統提示：</strong>無法連線至 API。若在本機檔案（file://）開啟，請改用 Live Server 或是存取 Render 線上版本。";
       }
     }
 
@@ -404,7 +401,7 @@
       window.speechSynthesis.speak(utterance);
     }
 
-    // Web Speech API 設定
+    // Web Speech API
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognition = new SpeechRecognition();
