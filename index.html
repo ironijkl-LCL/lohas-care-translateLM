@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>LINGO//PRIME - Multi-Language HUD</title>
+  <style>
+    :root {
+      --bg-dark: #080B11;
+      --panel-bg: rgba(18, 24, 38, 0.85);
+      --accent-cyan: #00F2FE;
+      --accent-purple: #7000FF;
+      --accent-gold: #FFB800;
+      --text-white: #FFFFFF;
+      --text-dim: #94A3B8;
+      --glow-cyan: 0 0 20px rgba(0, 242, 254, 0.4);
+      --glow-purple: 0 0 25px rgba(112, 0, 255, 0.5);
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: var(--font-family);
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 50% 0%, rgba(112, 0, 255, 0.2), transparent 70%),
+        radial-gradient(circle at 80% 80%, rgba(0, 242, 254, 0.15), transparent 50%);
+      color: var(--text-white);
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .hud-container {
+      width: 100%;
+      max-width: 440px;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand-tag {
+      font-weight: 900;
+      font-size: 20px;
+      letter-spacing: 1.5px;
+      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .status-pill {
+      background: rgba(0, 242, 254, 0.1);
+      border: 1px solid var(--accent-cyan);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      color: var(--accent-cyan);
+      box-shadow: var(--glow-cyan);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--accent-cyan);
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.3; transform: scale(0.8); }
+      50% { opacity: 1; transform: scale(1.2); }
+      100% { opacity: 0.3; transform: scale(0.8); }
+    }
+
+    .glass-card {
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 24px;
+      padding: 18px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .lang-selector-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .lang-select {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: var(--accent-cyan);
+      font-weight: bold;
+      padding: 6px 12px;
+      border-radius: 12px;
+      outline: none;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .tone-label {
+      font-size: 11px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .slider-container {
+      position: relative;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      padding: 4px;
+      display: flex;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .tone-btn {
+      flex: 1;
+      padding: 8px 0;
+      border: none;
+      background: transparent;
+      color: var(--text-dim);
+      font-weight: 700;
+      font-size: 12px;
+      cursor: pointer;
+      z-index: 2;
+      transition: color 0.3s ease;
+      text-align: center;
+    }
+
+    .tone-btn.active { color: #000; }
+
+    .slider-glider {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: calc(33.33% - 2.6px);
+      height: calc(100% - 8px);
+      background: linear-gradient(135deg, var(--accent-cyan), #00C6FF);
+      border-radius: 12px;
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: var(--glow-cyan);
+      z-index: 1;
+    }
+
+    .user-input-box {
+      font-size: 14px;
+      color: var(--text-dim);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 8px;
+      min-height: 24px;
+    }
+
+    .target-text {
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1.35;
+      color: #FFF;
+      min-height: 60px;
+    }
+
+    .insight-box {
+      background: rgba(112, 0, 255, 0.15);
+      border-left: 3px solid var(--accent-purple);
+      padding: 12px 14px;
+      border-radius: 0 12px 12px 0;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #E2E8F0;
+    }
+
+    .action-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .speak-btn {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      border: none;
+      color: #FFF;
+      font-weight: bold;
+      padding: 8px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      box-shadow: var(--glow-cyan);
+    }
+
+    .mic-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    .mic-trigger {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      cursor: pointer;
+      box-shadow: var(--glow-purple);
+      transition: all 0.2s ease;
+    }
+
+    .mic-trigger.recording {
+      animation: pulse 0.8s infinite alternate;
+      background: linear-gradient(135deg, #FF0055, #FF5500);
+      box-shadow: 0 0 35px rgba(255, 0, 85, 0.8);
+    }
+
+    .mic-hint {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="hud-container">
+    <div class="top-bar">
+      <div class="brand-tag">⚡ LINGO//PRIME</div>
+      <div class="status-pill"><div class="pulse-dot"></div> DIFY AI CONNECTED</div>
+    </div>
+
+    <!-- Target Language Selection -->
+    <div class="glass-card">
+      <div class="lang-selector-row">
+        <span style="font-size:12px; color:var(--text-dim);">目標語言 (Target Lang)</span>
+        <select class="lang-select" id="target-lang-select" onchange="onTargetLangChange()">
+          <option value="en-US" selected>🇺🇸 英語 (English)</option>
+          <option value="ja-JP">🇯🇵 日語 (Japanese)</option>
+          <option value="ko-KR">🇰🇷 韓語 (Korean)</option>
+          <option value="fr-FR">🇫🇷 法語 (French)</option>
+        </select>
+      </div>
+
+      <div class="tone-label">
+        <span>語氣風格 (Tone)</span>
+        <span id="tone-desc" style="color:var(--accent-cyan);">隨性地道</span>
+      </div>
+      <div class="slider-container">
+        <div class="slider-glider" id="glider"></div>
+        <button class="tone-btn active" onclick="switchTone(0)">Street</button>
+        <button class="tone-btn" onclick="switchTone(1)">Smart</button>
+        <button class="tone-btn" onclick="switchTone(2)">Elite</button>
+      </div>
+    </div>
+
+    <!-- Live Translation Screen -->
+    <div class="glass-card">
+      <div class="user-input-box" id="user-said">「 我想食壽司 」</div>
+      
+      <div class="target-text" id="target-text">
+        "Craving some sushi right now, got any spots?"
+      </div>
+
+      <div class="insight-box" id="insight-text">
+        <strong>👨‍🏫 名師解構：</strong>用 <em>"Craving..."</em>（極度想食某樣嘢）取代僵硬的 "I want to eat"，非常口語道地！
+      </div>
+
+      <div class="action-row">
+        <span style="font-size: 12px; color: var(--text-dim);" id="speech-status">分析完成</span>
+        <button class="speak-btn" onclick="speakTargetText()">🔊 語音發音</button>
+      </div>
+    </div>
+
+    <!-- Voice Control -->
+    <div class="mic-section">
+      <button class="mic-trigger" id="mic-btn" onclick="toggleListening()">🎙️</button>
+      <div class="mic-hint" id="mic-hint">按下開始收音 (廣東話)</div>
+    </div>
+  </div>
+
+  <script>
+    // Dify API 配置
+    const DIFY_API_BASE_URL = 'https://api.dify.ai/v1';
+    const DIFY_API_KEY = 'YOUR_DIFY_APP_API_KEY'; // ⚠️ 請更換為你的 Dify App API Key
+
+    let currentTone = 0; // 0: Street, 1: Smart, 2: Elite
+    let targetLang = "en-US";
+    let isListening = false;
+    let recognition = null;
+    let currentInputText = "我想食壽司";
+
+    // 呼叫 Dify API 連線邏輯
+    async function fetchDifyTranslation(inputText) {
+      const targetTextEl = document.getElementById('target-text');
+      const insightTextEl = document.getElementById('insight-text');
+      const statusEl = document.getElementById('speech-status');
+
+      statusEl.innerText = "⚡ AI 思考中...";
+
+      try {
+        const response = await fetch(`${DIFY_API_BASE_URL}/chat-messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${DIFY_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            inputs: {
+              tone: String(currentTone),
+              target_lang: targetLang
+            },
+            query: inputText,
+            response_mode: "blocking",
+            user: "lingo-prime-user"
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP Error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        // 解析內層字串 (處理轉義 JSON)
+        let parsedResult;
+        if (typeof data.answer === 'string') {
+          try {
+            parsedResult = JSON.parse(data.answer);
+          } catch {
+            // 如果二級不是 JSON 字串，則直接使用
+            parsedResult = { translation: data.answer, insight: "無解構資訊" };
+          }
+        } else {
+          parsedResult = data.answer || data;
+        }
+
+        // 更新介面
+        targetTextEl.innerText = `"${parsedResult.translation || parsedResult.text || ''}"`;
+        insightTextEl.innerHTML = `<strong>👨‍🏫 名師解構：</strong>${parsedResult.insight || '無詳細解構'}`;
+        statusEl.innerText = "分析完成";
+
+      } catch (error) {
+        console.error("Dify API Request Failed:", error);
+        statusEl.innerText = "❌ 傳輸錯誤";
+        insightTextEl.innerHTML = "<strong>⚠️ 系統提示：</strong>無法連線至 API，請檢查 API Key 或網路設定。";
+      }
+    }
+
+    function processAIResponse(input) {
+      fetchDifyTranslation(input);
+    }
+
+    function onTargetLangChange() {
+      targetLang = document.getElementById('target-lang-select').value;
+      processAIResponse(currentInputText);
+    }
+
+    function switchTone(index) {
+      currentTone = index;
+      document.getElementById('glider').style.transform = `translateX(${index * 100}%)`;
+      
+      const buttons = document.querySelectorAll('.tone-btn');
+      buttons.forEach((btn, i) => btn.classList.toggle('active', i === index));
+
+      const labels = ["隨性地道", "標準禮貌", "尊榮高階"];
+      document.getElementById('tone-desc').innerText = labels[index];
+
+      processAIResponse(currentInputText);
+    }
+
+    function speakTargetText() {
+      const text = document.getElementById('target-text').innerText.replace(/"/g, '');
+      if (!('speechSynthesis' in window)) return;
+
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = targetLang;
+      utterance.rate = 0.9;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    // Web Speech API 設定
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.lang = 'zh-HK';
+
+      recognition.onstart = () => {
+        isListening = true;
+        document.getElementById('mic-btn').classList.add('recording');
+        document.getElementById('speech-status').innerText = "🎙️ 錄音中...";
+      };
+
+      recognition.onresult = (event) => {
+        let transcript = event.results[0][0].transcript;
+        document.getElementById('user-said').innerText = `「 ${transcript} 」`;
+        currentInputText = transcript;
+        processAIResponse(transcript);
+      };
+
+      recognition.onend = () => {
+        isListening = false;
+        document.getElementById('mic-btn').classList.remove('recording');
+      };
+    }
+
+    function toggleListening() {
+      if (!recognition) {
+        alert("您的瀏覽器不支援語音辨識功能。");
+        return;
+      }
+      isListening ? recognition.stop() : recognition.start();
+    }
+  </script>
+</body>
+</html>
