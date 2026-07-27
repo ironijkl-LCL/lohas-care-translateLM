@@ -1,6 +1,26 @@
 import { NextResponse } from 'next/server';
 
+// 1. 處理瀏覽器的 OPTIONS 預檢請求 (Preflight)
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
+}
+
+// 2. 處理實際的 POST 翻譯請求
 export async function POST(request) {
+  // CORS 跨域回應標頭
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  };
+
   try {
     const body = await request.json();
     const { query, tone, target_lang } = body;
@@ -9,7 +29,7 @@ export async function POST(request) {
     const baseUrl = process.env.DIFY_API_BASE_URL || 'https://api.dify.ai/v1';
 
     if (!apiKey) {
-      return NextResponse.json({ error: 'Dify API Key 未設定' }, { status: 500 });
+      return NextResponse.json({ error: 'Dify API Key 未設定' }, { status: 500, headers: corsHeaders });
     }
 
     const response = await fetch(`${baseUrl}/chat-messages`, {
@@ -21,7 +41,7 @@ export async function POST(request) {
       body: JSON.stringify({
         inputs: {
           tone: String(tone ?? '0'),
-          target_lang: target_lang ?? 'en-US',
+          target_lang: targetLang ?? 'en-US',
         },
         query: query,
         response_mode: 'blocking',
@@ -42,9 +62,9 @@ export async function POST(request) {
       parsedResult = data.answer || data;
     }
 
-    return NextResponse.json(parsedResult);
+    return NextResponse.json(parsedResult, { headers: corsHeaders });
 
   } catch (error) {
-    return NextResponse.json({ error: 'Server Error', details: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Server Error', details: error.message }, { status: 500, headers: corsHeaders });
   }
 }
