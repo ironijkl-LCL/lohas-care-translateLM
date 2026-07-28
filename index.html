@@ -209,6 +209,7 @@
       border-radius: 20px;
       cursor: pointer;
       box-shadow: var(--glow-cyan);
+      transition: opacity 0.2s ease;
     }
 
     .mic-section {
@@ -245,7 +246,6 @@
       color: var(--text-dim);
     }
   </style>
-<base target="_blank">
 </head>
 <body>
 
@@ -305,290 +305,290 @@
   </div>
 
   <script>
-// ─── CONFIG ───
-const DIFY_API_BASE_URL = 'https://api.dify.ai/v1';
-const DIFY_API_KEY = 'app-NxfBcZH1BAb8eR0qcbd1GuUq';
+    // ─── CONFIG ───
+    const DIFY_API_BASE_URL = 'https://api.dify.ai/v1';
+    const DIFY_API_KEY = 'app-NxfBcZH1BAb8eR0qcbd1GuUq';
 
-// ─── STATE ───
-let currentTone = 0;          // 0: Street, 1: Smart, 2: Elite
-let targetLang = "en-US";
-let isListening = false;
-let isSpeaking = false;
-let recognition = null;
-let currentInputText = "我想食壽司";
-let finalTranscript = "";
-let abortController = null;
-let debounceTimer = null;
+    // ─── STATE ───
+    let currentTone = 0;          // 0: Street, 1: Smart, 2: Elite
+    let targetLang = "en-US";
+    let isListening = false;
+    let isSpeaking = false;
+    let recognition = null;
+    let currentInputText = "我想食壽司";
+    let finalTranscript = "";
+    let abortController = null;
+    let debounceTimer = null;
 
-// ─── API CALLER (debounced + abortable) ───
-function processAIResponse(input) {
-  currentInputText = input;
-  document.getElementById('user-said').innerText = `「 ${input} 」`;
+    // ─── API CALLER (debounced + abortable) ───
+    function processAIResponse(input) {
+      currentInputText = input;
+      document.getElementById('user-said').innerText = `「 ${input} 」`;
 
-  // Cancel any pending call and debounce rapid switches (e.g. tone spam)
-  if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => fetchDifyTranslation(input), 300);
-}
-
-async function fetchDifyTranslation(inputText) {
-  const targetTextEl = document.getElementById('target-text');
-  const insightTextEl = document.getElementById('insight-text');
-  const statusEl = document.getElementById('speech-status');
-
-  // Stop any playing TTS when new translation starts
-  stopSpeaking();
-
-  // Abort previous stale request
-  if (abortController) abortController.abort();
-  abortController = new AbortController();
-
-  statusEl.innerText = "⚡ AI 思考中...";
-  statusEl.style.color = "var(--accent-cyan)";
-
-  try {
-    let response;
-
-    // 1) Try local proxy first
-    try {
-      response = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: inputText,
-          tone: String(currentTone),
-          target_lang: targetLang
-        }),
-        signal: abortController.signal
-      });
-      if (!response.ok) throw new Error(`Proxy HTTP ${response.status}`);
-    } catch (err) {
-      if (err.name === 'AbortError') throw err;
-      // 2) Fallback to direct Dify API
-      response = await fetch(`${DIFY_API_BASE_URL}/chat-messages`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${DIFY_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          inputs: { tone: String(currentTone), target_lang: targetLang },
-          query: inputText,
-          response_mode: "blocking",
-          user: "lingo-prime-user"
-        }),
-        signal: abortController.signal
-      });
+      // 防彈化：取消前一次未完成的計時器，避免快速切換（如快速切換 Tone）時造成連續 API 請求
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => fetchDifyTranslation(input), 300);
     }
 
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    async function fetchDifyTranslation(inputText) {
+      const targetTextEl = document.getElementById('target-text');
+      const insightTextEl = document.getElementById('insight-text');
+      const statusEl = document.getElementById('speech-status');
 
-    const data = await response.json();
+      // 產生新翻譯時，自動停止正在播放的語音
+      stopSpeaking();
 
-    // ── Parse Dify response (handles nested JSON strings) ──
-    let parsedResult;
-    const rawAnswer = data.translation !== undefined ? data : (data.answer || data);
+      // 中斷前一次尚未完結的網路請求
+      if (abortController) abortController.abort();
+      abortController = new AbortController();
 
-    if (typeof rawAnswer === 'string') {
-      try { parsedResult = JSON.parse(rawAnswer); }
-      catch { parsedResult = { translation: rawAnswer, insight: "無詳細解構資訊" }; }
-    } else if (typeof data.answer === 'string') {
-      try { parsedResult = JSON.parse(data.answer); }
-      catch { parsedResult = { translation: data.answer, insight: "無詳細解構資訊" }; }
-    } else {
-      parsedResult = rawAnswer;
-    }
+      statusEl.innerText = "⚡ AI 思考中...";
+      statusEl.style.color = "var(--accent-cyan)";
 
-    const finalTranslation = parsedResult.translation || parsedResult.text || parsedResult.result || '（無翻譯結果）';
-    const finalInsight = parsedResult.insight || '無詳細解構';
+      try {
+        let response;
 
-    targetTextEl.innerText = `"${finalTranslation}"`;
-    insightTextEl.innerHTML = `<strong>👨‍🏫 名師解構：</strong>${finalInsight}`;
-    statusEl.innerText = "分析完成";
-    statusEl.style.color = "var(--text-dim)";
+        // 1) 優先嘗試本地 Proxy 端點
+        try {
+          response = await fetch('/api/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: inputText,
+              tone: String(currentTone),
+              target_lang: targetLang
+            }),
+            signal: abortController.signal
+          });
+          if (!response.ok) throw new Error(`Proxy HTTP ${response.status}`);
+        } catch (err) {
+          if (err.name === 'AbortError') throw err;
+          
+          // 2) 若 Proxy 失敗則回退至直接呼叫 Dify API
+          response = await fetch(`${DIFY_API_BASE_URL}/chat-messages`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${DIFY_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              inputs: { tone: String(currentTone), target_lang: targetLang },
+              query: inputText,
+              response_mode: "blocking",
+              user: "lingo-prime-user"
+            }),
+            signal: abortController.signal
+          });
+        }
 
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      console.log('Request superseded by newer input');
-      return;
-    }
-    console.error("Dify API Request Failed:", error);
-    statusEl.innerText = "❌ 傳輸錯誤";
-    statusEl.style.color = "#FF0055";
-    insightTextEl.innerHTML = "<strong>⚠️ 系統提示：</strong>無法連線至 API。若在本機檔案（file://）開啟，請使用 Render 線上服務：https://lohas-care-translatelm.onrender.com";
-  }
-}
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-// ─── UI HANDLERS ───
-function onTargetLangChange() {
-  targetLang = document.getElementById('target-lang-select').value;
-  processAIResponse(currentInputText);
-}
+        const data = await response.json();
 
-function switchTone(index) {
-  currentTone = index;
-  document.getElementById('glider').style.transform = `translateX(${index * 100}%)`;
+        // ── 解析 Dify 回覆（可自動解析嵌套 JSON 字串或常規物件） ──
+        let parsedResult;
+        const rawAnswer = data.translation !== undefined ? data : (data.answer || data);
 
-  const buttons = document.querySelectorAll('.tone-btn');
-  buttons.forEach((btn, i) => btn.classList.toggle('active', i === index));
+        if (typeof rawAnswer === 'string') {
+          try { parsedResult = JSON.parse(rawAnswer); }
+          catch { parsedResult = { translation: rawAnswer, insight: "無詳細解構資訊" }; }
+        } else if (typeof data.answer === 'string') {
+          try { parsedResult = JSON.parse(data.answer); }
+          catch { parsedResult = { translation: data.answer, insight: "無詳細解構資訊" }; }
+        } else {
+          parsedResult = rawAnswer;
+        }
 
-  const labels = ["隨性地道", "標準禮貌", "尊榮高階"];
-  document.getElementById('tone-desc').innerText = labels[index];
+        const finalTranslation = parsedResult.translation || parsedResult.text || parsedResult.result || '（無翻譯結果）';
+        const finalInsight = parsedResult.insight || '無詳細解構';
 
-  processAIResponse(currentInputText);
-}
+        targetTextEl.innerText = `"${finalTranslation}"`;
+        insightTextEl.innerHTML = `<strong>👨‍🏫 名師解構：</strong>${finalInsight}`;
+        statusEl.innerText = "分析完成";
+        statusEl.style.color = "var(--text-dim)";
 
-// ─── TTS (with error handling + Chrome bug fix) ───
-function stopSpeaking() {
-  if (isSpeaking) {
-    window.speechSynthesis.cancel();
-    isSpeaking = false;
-  }
-}
-
-function speakTargetText() {
-  const text = document.getElementById('target-text').innerText.replace(/"/g, '').trim();
-  if (!text || !('speechSynthesis' in window)) return;
-
-  stopSpeaking();
-
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = targetLang;
-  utterance.rate = 0.9;
-  utterance.pitch = 1;
-
-  const statusEl = document.getElementById('speech-status');
-  const btn = document.querySelector('.speak-btn');
-
-  // Chrome pauses TTS after ~15s; keep it alive
-  const keepAlive = setInterval(() => {
-    if (window.speechSynthesis.paused) window.speechSynthesis.resume();
-  }, 200);
-
-  utterance.onstart = () => {
-    isSpeaking = true;
-    statusEl.innerText = "🔊 播放中...";
-    statusEl.style.color = "var(--accent-cyan)";
-    btn.style.opacity = "0.6";
-    btn.style.pointerEvents = "none";
-  };
-
-  utterance.onend = () => {
-    clearInterval(keepAlive);
-    isSpeaking = false;
-    statusEl.innerText = "分析完成";
-    statusEl.style.color = "var(--text-dim)";
-    btn.style.opacity = "1";
-    btn.style.pointerEvents = "auto";
-  };
-
-  utterance.onerror = (e) => {
-    clearInterval(keepAlive);
-    isSpeaking = false;
-    statusEl.innerText = "❌ 語音播放失敗";
-    statusEl.style.color = "#FF0055";
-    btn.style.opacity = "1";
-    btn.style.pointerEvents = "auto";
-    console.error('TTS Error:', e.error || e);
-  };
-
-  window.speechSynthesis.speak(utterance);
-}
-
-// ─── SPEECH RECOGNITION (robust + interim results) ───
-function initSpeechRecognition() {
-  const hasSupport = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
-  if (!hasSupport) {
-    document.getElementById('mic-hint').innerText = "❌ 瀏覽器不支援語音辨識";
-    document.getElementById('mic-btn').style.opacity = "0.4";
-    document.getElementById('mic-btn').style.pointerEvents = "none";
-    return;
-  }
-
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recognition = new SpeechRecognition();
-  recognition.continuous = false;
-  recognition.interimResults = true;   // ← live preview while speaking
-  recognition.lang = 'zh-HK';
-  recognition.maxAlternatives = 1;
-
-  recognition.onstart = () => {
-    isListening = true;
-    finalTranscript = "";
-    document.getElementById('mic-btn').classList.add('recording');
-    document.getElementById('speech-status').innerText = "🎙️ 錄音中...";
-    document.getElementById('speech-status').style.color = "var(--accent-cyan)";
-    document.getElementById('mic-hint').innerText = "請說話... (廣東話)";
-  };
-
-  recognition.onresult = (event) => {
-    let interim = "";
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const t = event.results[i][0].transcript;
-      if (event.results[i].isFinal) finalTranscript += t;
-      else interim += t;
-    }
-    // Show live text as user speaks
-    document.getElementById('user-said').innerText = `「 ${finalTranscript || interim} 」`;
-  };
-
-  recognition.onerror = (event) => {
-    console.error('Speech error:', event.error);
-    let msg = "語音辨識錯誤";
-    switch (event.error) {
-      case 'no-speech':       msg = "🤫 未檢測到語音"; break;
-      case 'audio-capture':   msg = "🎤 無法存取麥克風"; break;
-      case 'not-allowed':     msg = "⛔ 麥克風權限被拒"; break;
-      case 'network':         msg = "🌐 網路錯誤"; break;
-      case 'aborted':         msg = "已取消"; break;
-      default:                msg = `❌ ${event.error}`;
-    }
-    document.getElementById('speech-status').innerText = msg;
-    document.getElementById('speech-status').style.color = "#FF0055";
-    document.getElementById('mic-hint').innerText = "按下重新開始 (廣東話)";
-  };
-
-  recognition.onend = () => {
-    isListening = false;
-    document.getElementById('mic-btn').classList.remove('recording');
-
-    const trimmed = finalTranscript.trim();
-    if (trimmed) {
-      currentInputText = trimmed;
-      processAIResponse(trimmed);
-      document.getElementById('mic-hint').innerText = "按下開始收音 (廣東話)";
-    } else {
-      // No speech captured
-      if (document.getElementById('speech-status').innerText === "🎙️ 錄音中...") {
-        document.getElementById('speech-status').innerText = "🤫 未檢測到語音";
-        document.getElementById('speech-status').style.color = "var(--text-dim)";
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          console.log('Request superseded by newer input');
+          return;
+        }
+        console.error("Dify API Request Failed:", error);
+        statusEl.innerText = "❌ 傳輸錯誤";
+        statusEl.style.color = "#FF0055";
+        insightTextEl.innerHTML = "<strong>⚠️ 系統提示：</strong>無法連線至 API。若在本機檔案（file://）開啟，請使用 Render 線上服務：https://lohas-care-translatelm.onrender.com";
       }
-      document.getElementById('mic-hint').innerText = "按下重新開始 (廣東話)";
     }
-  };
-}
 
-function toggleListening() {
-  if (!recognition) {
-    alert("您的瀏覽器不支援語音辨識功能。");
-    return;
-  }
-  if (isListening) {
-    recognition.stop();
-  } else {
-    stopSpeaking();          // cut TTS if user wants to speak
-    finalTranscript = "";
-    try {
-      recognition.start();
-    } catch (e) {
-      // Already started or invalid state → reset and retry
-      recognition.stop();
-      setTimeout(() => recognition.start(), 250);
+    // ─── UI HANDLERS ───
+    function onTargetLangChange() {
+      targetLang = document.getElementById('target-lang-select').value;
+      processAIResponse(currentInputText);
     }
-  }
-}
 
-// ─── BOOT ───
-initSpeechRecognition();
+    function switchTone(index) {
+      currentTone = index;
+      document.getElementById('glider').style.transform = `translateX(${index * 100}%)`;
+
+      const buttons = document.querySelectorAll('.tone-btn');
+      buttons.forEach((btn, i) => btn.classList.toggle('active', i === index));
+
+      const labels = ["隨性地道", "標準禮貌", "尊榮高階"];
+      document.getElementById('tone-desc').innerText = labels[index];
+
+      processAIResponse(currentInputText);
+    }
+
+    // ─── TTS (修復長語音截斷及異常處理) ───
+    function stopSpeaking() {
+      if (isSpeaking) {
+        window.speechSynthesis.cancel();
+        isSpeaking = false;
+      }
+    }
+
+    function speakTargetText() {
+      const text = document.getElementById('target-text').innerText.replace(/"/g, '').trim();
+      if (!text || !('speechSynthesis' in window)) return;
+
+      stopSpeaking();
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = targetLang;
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+
+      const statusEl = document.getElementById('speech-status');
+      const btn = document.querySelector('.speak-btn');
+
+      // 防修復：Chrome 長於約 15 秒會自動暫停 TTS，定期 resume 保持運作
+      const keepAlive = setInterval(() => {
+        if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+      }, 200);
+
+      utterance.onstart = () => {
+        isSpeaking = true;
+        statusEl.innerText = "🔊 播放中...";
+        statusEl.style.color = "var(--accent-cyan)";
+        btn.style.opacity = "0.6";
+        btn.style.pointerEvents = "none";
+      };
+
+      utterance.onend = () => {
+        clearInterval(keepAlive);
+        isSpeaking = false;
+        statusEl.innerText = "分析完成";
+        statusEl.style.color = "var(--text-dim)";
+        btn.style.opacity = "1";
+        btn.style.pointerEvents = "auto";
+      };
+
+      utterance.onerror = (e) => {
+        clearInterval(keepAlive);
+        isSpeaking = false;
+        statusEl.innerText = "❌ 語音播放失敗";
+        statusEl.style.color = "#FF0055";
+        btn.style.opacity = "1";
+        btn.style.pointerEvents = "auto";
+        console.error('TTS Error:', e.error || e);
+      };
+
+      window.speechSynthesis.speak(utterance);
+    }
+
+    // ─── SPEECH RECOGNITION (即時預覽與完善錯誤處理) ───
+    function initSpeechRecognition() {
+      const hasSupport = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+      if (!hasSupport) {
+        document.getElementById('mic-hint').innerText = "❌ 瀏覽器不支援語音辨識";
+        document.getElementById('mic-btn').style.opacity = "0.4";
+        document.getElementById('mic-btn').style.pointerEvents = "none";
+        return;
+      }
+
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;   // 開啟即時辨識預覽
+      recognition.lang = 'zh-HK';
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => {
+        isListening = true;
+        finalTranscript = "";
+        document.getElementById('mic-btn').classList.add('recording');
+        document.getElementById('speech-status').innerText = "🎙️ 錄音中...";
+        document.getElementById('speech-status').style.color = "var(--accent-cyan)";
+        document.getElementById('mic-hint').innerText = "請說話... (廣東話)";
+      };
+
+      recognition.onresult = (event) => {
+        let interim = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const t = event.results[i][0].transcript;
+          if (event.results[i].isFinal) finalTranscript += t;
+          else interim += t;
+        }
+        // 即時顯示說話內容
+        document.getElementById('user-said').innerText = `「 ${finalTranscript || interim} 」`;
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech error:', event.error);
+        let msg = "語音辨識錯誤";
+        switch (event.error) {
+          case 'no-speech':       msg = "🤫 未檢測到語音"; break;
+          case 'audio-capture':   msg = "🎤 無法存取麥克風"; break;
+          case 'not-allowed':     msg = "⛔ 麥克風權限被拒"; break;
+          case 'network':         msg = "🌐 網路錯誤"; break;
+          case 'aborted':         msg = "已取消"; break;
+          default:                msg = `❌ ${event.error}`;
+        }
+        document.getElementById('speech-status').innerText = msg;
+        document.getElementById('speech-status').style.color = "#FF0055";
+        document.getElementById('mic-hint').innerText = "按下重新開始 (廣東話)";
+      };
+
+      recognition.onend = () => {
+        isListening = false;
+        document.getElementById('mic-btn').classList.remove('recording');
+
+        const trimmed = finalTranscript.trim();
+        if (trimmed) {
+          currentInputText = trimmed;
+          processAIResponse(trimmed);
+          document.getElementById('mic-hint').innerText = "按下開始收音 (廣東話)";
+        } else {
+          if (document.getElementById('speech-status').innerText === "🎙️ 錄音中...") {
+            document.getElementById('speech-status').innerText = "🤫 未檢測到語音";
+            document.getElementById('speech-status').style.color = "var(--text-dim)";
+          }
+          document.getElementById('mic-hint').innerText = "按下重新開始 (廣東話)";
+        }
+      };
+    }
+
+    function toggleListening() {
+      if (!recognition) {
+        alert("您的瀏覽器不支援語音辨識功能。");
+        return;
+      }
+      if (isListening) {
+        recognition.stop();
+      } else {
+        stopSpeaking();          // 開始錄音時自動關閉播放中的語音
+        finalTranscript = "";
+        try {
+          recognition.start();
+        } catch (e) {
+          // 若處於異常狀態，先重置再重試
+          recognition.stop();
+          setTimeout(() => recognition.start(), 250);
+        }
+      }
+    }
+
+    // ─── BOOT ───
+    initSpeechRecognition();
   </script>
 </body>
 </html>
